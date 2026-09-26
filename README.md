@@ -1,8 +1,8 @@
 # Terraform AWS Secure Two-Tier VPC
 
-A portfolio infrastructure project that builds a production-style two-tier application environment on AWS with Terraform. The design emphasizes private compute, least-privilege network paths, managed access through Systems Manager, load-balanced traffic, HTTPS at the edge, and Auto Scaling Groups for self-healing capacity.
+The Terraform AWS Secure Two-Tier VPC portfolio project builds a multi-environment (DEV, PROD) two-tier application on AWS using Terraform for Infrastructure-as-Code (IaC). This project emphasizes private compute, lease-privilege network paths, managed access to project resources through AWS Systems Manger, load-balanced traffic, secure HTTPS communication at the edge, and applies Auto Scaling Groups for resiliency and self-healing capacity. 
 
-This project started as an AWS Solutions Architect Associate practice scenario and was expanded into a more realistic reference architecture suitable for demonstrating infrastructure-as-code, AWS networking, and security-focused design.
+The motivation behind this project was to create a project as a demonstration of my skills based on concepts learned through passing the AWS Solutions Architect Associates (AWS SAA) exam. These concepts include the use of Infrastructure-as-Code to provide a versioned, repeatable infrastructure, AWS networking, and a security-focused design. 
 
 ## Architecture
 
