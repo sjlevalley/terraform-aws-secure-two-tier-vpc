@@ -1,0 +1,100 @@
+#!/bin/bash
+set -euo pipefail
+
+exec > >(tee -a /var/log/two-tier-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf install -y python3 python3-pip
+
+if ! id two-tier-app >/dev/null 2>&1; then
+  useradd \
+    --system \
+    --user-group \
+    --no-create-home \
+    --home-dir /opt/two-tier-app \
+    --shell /sbin/nologin \
+    two-tier-app
+fi
+
+install -d -o root -g two-tier-app -m 0750 /opt/two-tier-app
+
+cat > /opt/two-tier-app/requirements.txt <<'REQUIREMENTS'
+Flask>=3.1,<4
+gunicorn>=23,<24
+REQUIREMENTS
+
+python3 -m venv /opt/two-tier-app/venv
+/opt/two-tier-app/venv/bin/pip install --no-cache-dir \
+  --requirement /opt/two-tier-app/requirements.txt
+
+cat > /opt/two-tier-app/app.py <<'PYTHON'
+#!/usr/bin/env python3
+
+import socket
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.get("/health")
+def health():
+    return jsonify(status="healthy"), 200
+
+
+@app.get("/api")
+@app.get("/api/")
+def api():
+    return jsonify(
+        message="Hello from the application tier",
+        hostname=socket.gethostname(),
+    )
+PYTHON
+
+chown -R root:two-tier-app /opt/two-tier-app
+chmod 0750 /opt/two-tier-app
+chmod 0640 /opt/two-tier-app/app.py /opt/two-tier-app/requirements.txt
+
+cat > /etc/systemd/system/two-tier-app.service <<'SYSTEMD'
+[Unit]
+Description=Two-tier sample application service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=two-tier-app
+Group=two-tier-app
+WorkingDirectory=/opt/two-tier-app
+ExecStart=/opt/two-tier-app/venv/bin/gunicorn --bind 0.0.0.0:8080 --workers 2 --access-logfile - --error-logfile - app:app
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD
+
+chmod 0644 /etc/systemd/system/two-tier-app.service
+
+systemctl daemon-reload
+systemctl enable --now two-tier-app.service
+
+for attempt in {1..10}; do
+  if curl --fail --silent --show-error http://127.0.0.1:8080/health; then
+    exit 0
+  fi
+
+  sleep 2
+done
+
+systemctl status two-tier-app.service --no-pager
+exit 1

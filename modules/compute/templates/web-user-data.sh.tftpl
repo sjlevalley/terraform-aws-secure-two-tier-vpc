@@ -1,0 +1,58 @@
+#!/bin/bash
+set -euo pipefail
+
+exec > >(tee -a /var/log/two-tier-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf install -y nginx
+
+cat > /usr/share/nginx/html/index.html <<'HTML'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Two-tier application</title>
+  </head>
+  <body>
+    <h1>${instance_name}</h1>
+  </body>
+</html>
+HTML
+
+install -d -o root -g root -m 0755 /etc/nginx/default.d
+
+cat > /etc/nginx/default.d/two-tier.conf <<'NGINX'
+location = /health {
+  access_log off;
+  default_type text/plain;
+  return 200 "healthy\n";
+}
+
+location /api {
+  proxy_pass http://${internal_alb_dns_name}:${app_port};
+  proxy_http_version 1.1;
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+
+  proxy_connect_timeout 5s;
+  proxy_read_timeout 30s;
+}
+NGINX
+
+nginx -t
+
+systemctl enable --now nginx
+
+for attempt in {1..10}; do
+  if curl --fail --silent --show-error http://127.0.0.1/health >/dev/null; then
+    exit 0
+  fi
+
+  sleep 2
+done
+
+systemctl status nginx --no-pager
+exit 1
