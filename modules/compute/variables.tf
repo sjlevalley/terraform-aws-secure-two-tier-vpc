@@ -72,3 +72,8 @@ variable "app_target_group_arn" {
   description = "ARN of the app target group attached to the app ASG"
   type        = string
 }
+
+variable "log_group_names" {
+  description = "CloudWatch log group names keyed by log purpose"
+  type        = map(string)
+}

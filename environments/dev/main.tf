@@ -30,6 +30,13 @@ module "load_balancing" {
   certificate_arn                = aws_acm_certificate_validation.public.certificate_arn
 }
 
+module "observability" {
+  source = "../../modules/observability"
+
+  name_prefix = local.name_prefix
+  common_tags = local.common_tags
+}
+
 
 
 module "compute" {
@@ -47,6 +54,8 @@ module "compute" {
   app_port              = var.app_port
   web_target_group_arn  = module.load_balancing.web_target_group_arn
   app_target_group_arn  = module.load_balancing.app_target_group_arn
+
+  log_group_names = module.observability.log_group_names
 }
 
 
@@ -105,12 +114,4 @@ resource "aws_route53_record" "app" {
     zone_id                = module.load_balancing.public_alb_zone_id
     evaluate_target_health = true
   }
-}
-
-
-module "observability" {
-  source = "../../modules/observability"
-
-  name_prefix = local.name_prefix
-  common_tags = local.common_tags
 }

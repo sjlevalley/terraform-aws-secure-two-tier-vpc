@@ -39,9 +39,13 @@ resource "aws_launch_template" "web" {
   user_data = base64encode(templatefile(
     "${path.module}/templates/web-user-data.sh.tftpl",
     {
-      instance_name         = "web-asg"
-      internal_alb_dns_name = var.internal_alb_dns_name
-      app_port              = var.app_port
+      instance_name              = "web-asg"
+      internal_alb_dns_name      = var.internal_alb_dns_name
+      app_port                   = var.app_port
+      web_nginx_access_log_group = var.log_group_names["web_nginx_access"]
+      web_nginx_error_log_group  = var.log_group_names["web_nginx_error"]
+      web_bootstrap_log_group    = var.log_group_names["web_bootstrap"]
+      web_system_log_group       = var.log_group_names["web_system"]
     }
   ))
 
