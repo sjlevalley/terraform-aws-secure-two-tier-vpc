@@ -27,3 +27,13 @@ output "public_alb_dns_name" {
   description = "DNS name of the public application load balancer"
   value       = module.load_balancing.public_alb_dns_name
 }
+
+output "cloudwatch_dashboard_name" {
+  description = "Name of the CloudWatch dashboard"
+  value       = module.observability.dashboard_name
+}
+
+output "alerts_topic_arn" {
+  description = "ARN of the SNS topic used for CloudWatch alarm notifications"
+  value       = module.observability.alerts_topic_arn
+}

@@ -39,3 +39,13 @@ variable "alarm_email" {
   type        = string
   default     = null
 }
+
+variable "web_asg_name" {
+  description = "Name of the web Auto Scaling Group"
+  type        = string
+}
+
+variable "app_asg_name" {
+  description = "Name of the app Auto Scaling Group"
+  type        = string
+}

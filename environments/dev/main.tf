@@ -40,6 +40,8 @@ module "observability" {
   web_target_group_arn_suffix = module.load_balancing.web_target_group_arn_suffix
   app_target_group_arn_suffix = module.load_balancing.app_target_group_arn_suffix
   alarm_email                 = var.alarm_email
+  web_asg_name                = module.compute.web_asg_name
+  app_asg_name                = module.compute.app_asg_name
 }
 
 
