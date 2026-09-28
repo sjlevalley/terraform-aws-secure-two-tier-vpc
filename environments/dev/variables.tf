@@ -39,3 +39,8 @@ variable "hosted_zone_id" {
   type        = string
 }
 
+variable "alarm_email" {
+  description = "Optional email address for CloudWatch alarm notifications"
+  type        = string
+  default     = null
+}

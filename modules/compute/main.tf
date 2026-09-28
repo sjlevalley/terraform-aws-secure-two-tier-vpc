@@ -103,7 +103,11 @@ resource "aws_launch_template" "app" {
 
   user_data = base64encode(templatefile(
     "${path.module}/templates/app-user-data.sh.tftpl",
-    {}
+    {
+      app_service_log_group   = var.log_group_names["app_service"]
+      app_bootstrap_log_group = var.log_group_names["app_bootstrap"]
+      app_system_log_group    = var.log_group_names["app_system"]
+    }
   ))
 
   tag_specifications {
