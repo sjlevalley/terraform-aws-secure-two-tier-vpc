@@ -127,8 +127,10 @@ resource "aws_autoscaling_group" "web" {
   min_size            = 2
   desired_capacity    = 2
   max_size            = 4
+  default_instance_warmup = 300
   vpc_zone_identifier = values(var.private_subnet_ids)
   target_group_arns   = [var.web_target_group_arn]
+  termination_policies = ["OldestLaunchTemplate", "OldestInstance", "Default"]
 
   health_check_type         = "ELB"
   health_check_grace_period = 300
@@ -142,8 +144,9 @@ resource "aws_autoscaling_group" "web" {
     strategy = "Rolling"
 
     preferences {
-      min_healthy_percentage = 50
+      min_healthy_percentage = 100
       instance_warmup        = 300
+      
     }
   }
 
@@ -170,8 +173,10 @@ resource "aws_autoscaling_group" "app" {
   min_size            = 2
   desired_capacity    = 2
   max_size            = 4
+  default_instance_warmup = 300
   vpc_zone_identifier = values(var.private_subnet_ids)
   target_group_arns   = [var.app_target_group_arn]
+  termination_policies = ["OldestLaunchTemplate", "OldestInstance", "Default"]
 
   health_check_type         = "ELB"
   health_check_grace_period = 300
@@ -185,7 +190,7 @@ resource "aws_autoscaling_group" "app" {
     strategy = "Rolling"
 
     preferences {
-      min_healthy_percentage = 50
+      min_healthy_percentage = 100
       instance_warmup        = 300
     }
   }
@@ -204,5 +209,34 @@ resource "aws_autoscaling_group" "app" {
       value               = tag.value
       propagate_at_launch = true
     }
+  }
+}
+
+
+resource "aws_autoscaling_policy" "web_cpu_target_tracking" {
+  name                   = "${var.name_prefix}-web-cpu-target-tracking"
+  autoscaling_group_name = aws_autoscaling_group.web.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+
+    target_value = 50
+  }
+}
+
+resource "aws_autoscaling_policy" "app_cpu_target_tracking" {
+  name                   = "${var.name_prefix}-app-cpu-target-tracking"
+  autoscaling_group_name = aws_autoscaling_group.app.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+
+    target_value = 50
   }
 }
