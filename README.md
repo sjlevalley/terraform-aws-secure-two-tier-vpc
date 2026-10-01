@@ -1,10 +1,52 @@
 # Terraform AWS Secure Two-Tier VPC
 
-This Terraform AWS Secure Two-Tier VPC portfolio project builds a multi-environment (DEV, PROD) two-tier application on AWS using Terraform for Infrastructure-as-Code (IaC). This project emphasizes private compute, lease-privilege network paths, managed access to project resources through AWS Systems Manger, load-balanced traffic, secure HTTPS communication at the edge, and applies Auto Scaling Groups for resiliency and self-healing capacity. 
+This Terraform AWS Secure Two-Tier VPC portfolio project builds a production-style dev environment for a two-tier application on AWS using Terraform for Infrastructure-as-Code (IaC). This project emphasizes private compute, least-privilege network paths, managed access to project resources through AWS Systems Manager, load-balanced traffic, secure HTTPS communication at the edge, centralized observability, and Auto Scaling Groups for resiliency and self-healing capacity.
 
 The motivation behind this project was to create a project as a demonstration of my skills based on concepts learned through passing the AWS Solutions Architect Associates (AWS SAA) exam. These concepts include the use of Infrastructure-as-Code to provide a versioned, repeatable infrastructure, AWS networking, and a security-focused design. 
 
 ## Architecture
+
+```mermaid
+flowchart TB
+  user[Internet users] -->|HTTPS 443| r53[Route 53 alias record]
+  r53 --> publicAlb[Public Application Load Balancer]
+  publicHttp[HTTP 80] -->|301 redirect| publicAlb
+
+  subgraph aws[AWS account / Region]
+    acm[ACM certificate<br/>DNS validation]
+    cw[CloudWatch Logs, Metrics,<br/>Alarms, Dashboard]
+    sns[SNS alerts]
+    s3[(Encrypted S3 bucket<br/>optional ALB access logs)]
+
+    subgraph vpc[VPC across two Availability Zones]
+      igw[Internet Gateway]
+
+      subgraph public[Public subnets]
+        nat[NAT Gateway]
+        publicAlb
+      end
+
+      subgraph private[Private subnets]
+        webAsg[Web Auto Scaling Group<br/>Nginx on port 80]
+        internalAlb[Internal Application Load Balancer<br/>HTTP 8080]
+        appAsg[App Auto Scaling Group<br/>Flask/Gunicorn on port 8080]
+      end
+    end
+  end
+
+  publicAlb -->|HTTP 80| webAsg
+  webAsg -->|HTTP 8080 /api| internalAlb
+  internalAlb -->|HTTP 8080| appAsg
+  webAsg -->|package access and AWS APIs| nat
+  appAsg -->|package access and AWS APIs| nat
+  nat --> igw
+  publicAlb -. access logs .-> s3
+  internalAlb -. access logs .-> s3
+  webAsg -. logs and metrics .-> cw
+  appAsg -. logs and metrics .-> cw
+  cw --> sns
+  acm --> publicAlb
+```
 
 ```text
 Internet
@@ -35,11 +77,50 @@ Supporting components:
 - ACM certificate with DNS validation
 - IAM instance profile for AWS Systems Manager access
 - NAT gateway for private instance bootstrap and package access
+- CloudWatch log groups, metrics, alarms, dashboard, and optional SNS email notifications
+- Optional encrypted S3 bucket for public and internal ALB access logs
 - Security groups using source security group references instead of broad private CIDR rules
+
+## Security Flow
+
+```mermaid
+flowchart LR
+  internet[Internet] -->|80 redirect / 443 HTTPS| publicAlbSg[Public ALB SG]
+  publicAlbSg -->|80 HTTP| webSg[Web SG]
+  webSg -->|8080 HTTP| internalAlbSg[Internal ALB SG]
+  internalAlbSg -->|8080 HTTP| appSg[App SG]
+
+  webSg -. no SSH .- blocked1[No inbound port 22]
+  appSg -. no public IP .- blocked2[No direct internet ingress]
+```
+
+## Module Composition
+
+```mermaid
+flowchart TD
+  dev[environments/dev] --> network[modules/network]
+  dev --> security[modules/security-groups]
+  dev --> lb[modules/load-balancing]
+  dev --> identity[modules/instance-identity]
+  dev --> observability[modules/observability]
+  dev --> compute[modules/compute]
+  dev --> dns[Route 53 + ACM resources]
+  dev --> albLogs[Optional ALB access log S3 resources]
+
+  network --> security
+  network --> lb
+  security --> lb
+  security --> compute
+  identity --> compute
+  lb --> compute
+  lb --> observability
+  compute --> observability
+```
 
 ## What This Demonstrates
 
 - Modular Terraform design with reusable `network`, `security-groups`, `load-balancing`, `compute`, and `instance-identity` modules
+- Centralized observability with a reusable `observability` module
 - Multi-AZ AWS network layout with public and private subnet tiers
 - Internet-facing and internal Application Load Balancers
 - HTTPS listener with HTTP-to-HTTPS redirect
@@ -47,6 +128,8 @@ Supporting components:
 - Private EC2 instances with no public IPv4 addresses
 - Launch Templates and Auto Scaling Groups for web and app tiers
 - ALB target group health checks and automatic replacement of unhealthy instances
+- CloudWatch log groups, instance metrics, alarms, dashboard, and SNS alerting
+- Optional encrypted S3 ALB access logs with lifecycle retention
 - IMDSv2 enforcement and encrypted `gp3` root volumes
 - Systems Manager-ready instance identity without SSH keys
 - Nginx reverse proxy from the web tier to the internal app endpoint
@@ -76,6 +159,7 @@ Instance hardening includes:
 .
 |-- environments/
 |   `-- dev/
+|       |-- alb-access-logs.tf
 |       |-- main.tf
 |       |-- variables.tf
 |       |-- outputs.tf
@@ -87,6 +171,7 @@ Instance hardening includes:
 |   |-- instance-identity/
 |   |-- load-balancing/
 |   |-- network/
+|   |-- observability/
 |   `-- security-groups/
 ```
 
@@ -102,6 +187,8 @@ The most useful files to inspect first are:
 - `modules/load-balancing/main.tf` for public and internal ALB configuration
 - `modules/compute/main.tf` for Launch Templates and Auto Scaling Groups
 - `modules/compute/templates/` for the web and application bootstrap scripts
+- `modules/observability/main.tf` for CloudWatch logs, metrics, alarms, dashboard, and SNS
+- `environments/dev/alb-access-logs.tf` for optional encrypted ALB access log storage
 
 ## Running It Yourself
 
@@ -131,6 +218,7 @@ Update `dev.tfvars` with your own domain and Route 53 hosted zone ID:
 ```hcl
 domain_name    = "app.example.com"
 hosted_zone_id = "REPLACE_WITH_ROUTE53_HOSTED_ZONE_ID"
+alarm_email    = null
 ```
 
 Then plan and apply:
@@ -159,6 +247,8 @@ Expected behavior:
 - `/api/` returns a JSON response from the private application tier.
 
 You can also terminate one ASG-managed web or app instance and confirm that the Auto Scaling Group launches a replacement that becomes healthy in the appropriate target group.
+
+For observability, confirm that CloudWatch log streams appear for the web and app instances, review the generated CloudWatch dashboard, and confirm the SNS subscription if `alarm_email` is configured.
 
 ## Cost And Cleanup
 
