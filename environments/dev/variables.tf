@@ -44,3 +44,20 @@ variable "alarm_email" {
   type        = string
   default     = null
 }
+
+variable "enable_alb_access_logs" {
+  description = "Whether to enable public and internal ALB access logs in encrypted S3 storage"
+  type        = bool
+  default     = true
+}
+
+variable "alb_access_logs_retention_days" {
+  description = "Number of days to retain ALB access logs in S3"
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.alb_access_logs_retention_days > 0
+    error_message = "ALB access log retention must be at least 1 day."
+  }
+}

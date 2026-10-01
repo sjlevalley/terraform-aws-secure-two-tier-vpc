@@ -42,3 +42,27 @@ variable "certificate_arn" {
   description = "ACM certificate ARN for the HTTPS listener"
   type        = string
 }
+
+variable "alb_access_logs_enabled" {
+  description = "Whether to enable S3 access logs for both load balancers"
+  type        = bool
+  default     = false
+}
+
+variable "alb_access_logs_bucket" {
+  description = "S3 bucket name that receives ALB access logs"
+  type        = string
+  default     = null
+}
+
+variable "public_alb_access_logs_prefix" {
+  description = "S3 prefix for public ALB access logs. Must not include AWSLogs."
+  type        = string
+  default     = null
+}
+
+variable "internal_alb_access_logs_prefix" {
+  description = "S3 prefix for internal ALB access logs. Must not include AWSLogs."
+  type        = string
+  default     = null
+}

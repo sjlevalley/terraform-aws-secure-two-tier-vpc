@@ -37,3 +37,8 @@ output "alerts_topic_arn" {
   description = "ARN of the SNS topic used for CloudWatch alarm notifications"
   value       = module.observability.alerts_topic_arn
 }
+
+output "alb_access_logs_bucket_name" {
+  description = "S3 bucket that stores public and internal ALB access logs"
+  value       = var.enable_alb_access_logs ? aws_s3_bucket.alb_access_logs[0].bucket : null
+}

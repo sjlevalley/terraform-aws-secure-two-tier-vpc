@@ -19,15 +19,23 @@ module "security_groups" {
 module "load_balancing" {
   source = "../../modules/load-balancing"
 
-  vpc_id                         = module.network.vpc_id
-  private_subnet_ids             = module.network.private_subnet_ids
-  internal_alb_security_group_id = module.security_groups.internal_alb_security_group_id
-  app_port                       = var.app_port
-  name_prefix                    = local.name_prefix
-  common_tags                    = local.common_tags
-  public_subnet_ids              = module.network.public_subnet_ids
-  public_alb_security_group_id   = module.security_groups.public_alb_security_group_id
-  certificate_arn                = aws_acm_certificate_validation.public.certificate_arn
+  vpc_id                          = module.network.vpc_id
+  private_subnet_ids              = module.network.private_subnet_ids
+  internal_alb_security_group_id  = module.security_groups.internal_alb_security_group_id
+  app_port                        = var.app_port
+  name_prefix                     = local.name_prefix
+  common_tags                     = local.common_tags
+  public_subnet_ids               = module.network.public_subnet_ids
+  public_alb_security_group_id    = module.security_groups.public_alb_security_group_id
+  certificate_arn                 = aws_acm_certificate_validation.public.certificate_arn
+  alb_access_logs_enabled         = var.enable_alb_access_logs
+  alb_access_logs_bucket          = var.enable_alb_access_logs ? aws_s3_bucket.alb_access_logs[0].bucket : null
+  public_alb_access_logs_prefix   = "public-alb"
+  internal_alb_access_logs_prefix = "internal-alb"
+
+  depends_on = [
+    aws_s3_bucket_policy.alb_access_logs
+  ]
 }
 
 module "observability" {

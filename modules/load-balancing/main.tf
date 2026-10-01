@@ -9,6 +9,12 @@ resource "aws_lb" "internal" {
   enable_deletion_protection = false
   drop_invalid_header_fields = true
 
+  access_logs {
+    enabled = var.alb_access_logs_enabled
+    bucket  = var.alb_access_logs_bucket
+    prefix  = var.internal_alb_access_logs_prefix
+  }
+
   tags = merge(var.common_tags, {
     Name = "${var.name_prefix}-internal-alb"
     Tier = "internal-load-balancer"
@@ -67,6 +73,12 @@ resource "aws_lb" "public" {
 
   enable_deletion_protection = false
   drop_invalid_header_fields = true
+
+  access_logs {
+    enabled = var.alb_access_logs_enabled
+    bucket  = var.alb_access_logs_bucket
+    prefix  = var.public_alb_access_logs_prefix
+  }
 
   tags = merge(var.common_tags, {
     Name = "${var.name_prefix}-public-alb"
