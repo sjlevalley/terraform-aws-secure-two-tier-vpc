@@ -6,56 +6,66 @@ The motivation behind this project was to create a project as a demonstration of
 
 ## Architecture
 
+Numbered edges show the request path. Thick lines carry application traffic, dotted lines are control plane, DNS, and telemetry. TLS terminates at the public ALB; everything behind it is plain HTTP on private subnets.
+
 ```mermaid
 flowchart TB
-  user[Internet users] -->|HTTPS 443| r53[Route 53 alias record]
-  r53 --> publicAlb[Public Application Load Balancer]
-  publicHttp[HTTP 80] -->|301 redirect| publicAlb
+  user([Internet users])
 
-  subgraph aws[AWS account / Region]
-    acm[ACM certificate<br/>DNS validation]
-    cw[CloudWatch Logs, Metrics,<br/>Alarms, Dashboard]
-    sns[SNS alerts]
-    s3[(Encrypted S3 bucket<br/>optional ALB access logs)]
-
-    subgraph vpc[VPC across two Availability Zones]
-      igw[Internet Gateway]
-
-      subgraph public[Public subnets]
-        nat[NAT Gateway]
-        publicAlb
-      end
-
-      subgraph private[Private subnets]
-        webAsg[Web Auto Scaling Group<br/>Nginx on port 80]
-        internalAlb[Internal Application Load Balancer<br/>HTTP 8080]
-        appAsg[App Auto Scaling Group<br/>Flask/Gunicorn on port 8080]
-      end
-    end
+  subgraph edge[DNS and certificate]
+    direction LR
+    r53[Route 53<br/>alias A record for app hostname]
+    acm[ACM certificate<br/>DNS validated]
+    r53 -. validation CNAME records .-> acm
   end
 
-  publicAlb -->|HTTP 80| webAsg
-  webAsg -->|HTTP 8080 /api| internalAlb
-  internalAlb -->|HTTP 8080| appAsg
-  webAsg -->|package access and AWS APIs| nat
-  appAsg -->|package access and AWS APIs| nat
-  nat --> igw
-  publicAlb -. access logs .-> s3
-  internalAlb -. access logs .-> s3
-  webAsg -. logs and metrics .-> cw
-  appAsg -. logs and metrics .-> cw
-  cw --> sns
-  acm --> publicAlb
+  user -->|1. DNS lookup| r53
+  user ==>|2. HTTPS 443| igw
+  user -. HTTP 80 is answered with 301 to HTTPS .-> igw
+
+  subgraph vpc[VPC across two Availability Zones]
+    igw[Internet Gateway]
+
+    subgraph public[Public subnets]
+      publicAlb[Public Application Load Balancer<br/>443 HTTPS listener: TLS termination<br/>80 HTTP listener: 301 redirect]
+      nat[NAT Gateway<br/>outbound only for private subnets:<br/>packages, AWS APIs, SSM]
+    end
+
+    subgraph private[Private subnets, no public IPs]
+      webAsg[Web Auto Scaling Group<br/>Nginx on port 80]
+      internalAlb[Internal Application Load Balancer<br/>HTTP 8080]
+      appAsg[App Auto Scaling Group<br/>Flask/Gunicorn on port 8080]
+    end
+
+    igw ==> publicAlb
+    publicAlb ==>|3. HTTP 80, inside the VPC| webAsg
+    webAsg ==>|4. HTTP 8080 for /api| internalAlb
+    internalAlb ==>|5. HTTP 8080| appAsg
+  end
+
+  acm -->|certificate on 443 listener| publicAlb
+  r53 -. alias target .-> publicAlb
+
+  subgraph obs[Observability]
+    direction LR
+    cw[CloudWatch<br/>Logs, metrics, alarms, dashboard]
+    sns[SNS email alerts]
+    s3[(Encrypted S3 bucket<br/>optional ALB access logs)]
+    cw --> sns
+  end
+
+  vpc -. logs and metrics from ALBs, ASGs, instances .-> cw
+  publicAlb & internalAlb -. access logs .-> s3
 ```
 
 ```text
 Internet
   |
-  | HTTPS
+  | HTTPS :443  (HTTP :80 is 301-redirected to HTTPS :443)
   v
-Public Application Load Balancer
+Public Application Load Balancer  (TLS terminates here, ACM certificate)
   |
-  | HTTP :80
+  | HTTP :80  (inside the VPC)
   v
 Private Web Auto Scaling Group
   |
@@ -85,7 +95,7 @@ Supporting components:
 
 ```mermaid
 flowchart LR
-  internet[Internet] -->|80 redirect / 443 HTTPS| publicAlbSg[Public ALB SG]
+  internet[Internet] -->|443 HTTPS, 80 for redirect only| publicAlbSg[Public ALB SG]
   publicAlbSg -->|80 HTTP| webSg[Web SG]
   webSg -->|8080 HTTP| internalAlbSg[Internal ALB SG]
   internalAlbSg -->|8080 HTTP| appSg[App SG]
@@ -123,7 +133,7 @@ flowchart TD
 - Centralized observability with a reusable `observability` module
 - Multi-AZ AWS network layout with public and private subnet tiers
 - Internet-facing and internal Application Load Balancers
-- HTTPS listener with HTTP-to-HTTPS redirect
+- HTTPS listener (TLS 1.3/1.2 security policy, ACM certificate) with HTTP-to-HTTPS 301 redirect
 - Route 53 DNS integration and ACM DNS certificate validation
 - Private EC2 instances with no public IPv4 addresses
 - Launch Templates and Auto Scaling Groups for web and app tiers
@@ -140,7 +150,7 @@ The public ALB is the only internet-facing application entry point. Web and appl
 
 Security group flow is intentionally narrow:
 
-- Public ALB accepts inbound HTTP/HTTPS from the internet.
+- Public ALB accepts inbound HTTPS (443) from the internet, plus HTTP (80) solely to return a 301 redirect to HTTPS.
 - Web tier accepts HTTP only from the public ALB security group.
 - Internal ALB accepts application traffic only from the web security group.
 - App tier accepts application traffic only from the internal ALB security group.
@@ -196,7 +206,7 @@ Prerequisites:
 
 - Terraform `1.16.2`
 - AWS CLI credentials for an account where you can create VPC, EC2, IAM, ALB, ACM, and Route 53 resources
-- A Route 53 hosted zone if you want to deploy HTTPS and DNS
+- A Route 53 public hosted zone for your domain (required: the ACM certificate is DNS-validated and the app hostname is an alias record to the public ALB)
 
 From the Terraform root:
 
@@ -242,7 +252,7 @@ curl --fail https://app.example.com/api/
 
 Expected behavior:
 
-- HTTP redirects to HTTPS.
+- `http://` returns `301 Moved Permanently` with a `Location: https://...` header.
 - `/health` returns a web-tier health response.
 - `/api/` returns a JSON response from the private application tier.
 
