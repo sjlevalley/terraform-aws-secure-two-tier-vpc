@@ -131,14 +131,14 @@ resource "aws_launch_template" "app" {
 
 
 resource "aws_autoscaling_group" "web" {
-  name                = "${var.name_prefix}-web-asg"
-  min_size            = 2
-  desired_capacity    = 2
-  max_size            = 4
+  name                    = "${var.name_prefix}-web-asg"
+  min_size                = 2
+  desired_capacity        = 2
+  max_size                = 4
   default_instance_warmup = 300
-  vpc_zone_identifier = values(var.private_subnet_ids)
-  target_group_arns   = [var.web_target_group_arn]
-  termination_policies = ["OldestLaunchTemplate", "OldestInstance", "Default"]
+  vpc_zone_identifier     = values(var.private_subnet_ids)
+  target_group_arns       = [var.web_target_group_arn]
+  termination_policies    = ["OldestLaunchTemplate", "OldestInstance", "Default"]
 
   metrics_granularity = "1Minute"
 
@@ -164,7 +164,7 @@ resource "aws_autoscaling_group" "web" {
     preferences {
       min_healthy_percentage = 100
       instance_warmup        = 300
-      
+
     }
   }
 
@@ -187,14 +187,14 @@ resource "aws_autoscaling_group" "web" {
 
 
 resource "aws_autoscaling_group" "app" {
-  name                = "${var.name_prefix}-app-asg"
-  min_size            = 2
-  desired_capacity    = 2
-  max_size            = 4
+  name                    = "${var.name_prefix}-app-asg"
+  min_size                = 2
+  desired_capacity        = 2
+  max_size                = 4
   default_instance_warmup = 300
-  vpc_zone_identifier = values(var.private_subnet_ids)
-  target_group_arns   = [var.app_target_group_arn]
-  termination_policies = ["OldestLaunchTemplate", "OldestInstance", "Default"]
+  vpc_zone_identifier     = values(var.private_subnet_ids)
+  target_group_arns       = [var.app_target_group_arn]
+  termination_policies    = ["OldestLaunchTemplate", "OldestInstance", "Default"]
 
   metrics_granularity = "1Minute"
 

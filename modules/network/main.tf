@@ -103,8 +103,12 @@ resource "aws_route_table_association" "private" {
 
 
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public["public_a"].id
+  for_each = var.nat_gateway_mode == "per_az" ? aws_subnet.public : {
+    public_a = aws_subnet.public["public_a"]
+  }
+
+  allocation_id = aws_eip.nat[each.key].id
+  subnet_id     = each.value.id
 
   depends_on = [aws_internet_gateway.main]
 
@@ -115,10 +119,14 @@ resource "aws_nat_gateway" "main" {
 
 
 resource "aws_eip" "nat" {
+  for_each = var.nat_gateway_mode == "per_az" ? aws_subnet.public : {
+    public_a = aws_subnet.public["public_a"]
+  }
+
   domain = "vpc"
 
   tags = merge(var.common_tags, {
-    Name = "${var.name_prefix}-nat-eip"
+    Name = "${var.name_prefix}-${each.key}-nat-eip"
   })
 }
 
@@ -128,5 +136,10 @@ resource "aws_route" "private_internet" {
 
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main.id
+
+  nat_gateway_id = var.nat_gateway_mode == "per_az" ? (
+    aws_nat_gateway.main[replace(each.key, "private", "public")].id
+    ) : (
+    aws_nat_gateway.main["public_a"].id
+  )
 }

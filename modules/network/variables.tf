@@ -30,3 +30,15 @@ variable "common_tags" {
   description = "Tags applied to module resources"
   type        = map(string)
 }
+
+
+variable "nat_gateway_mode" {
+  description = "NAT gateway deployment mode. Use single for low cost or per_az for high availability."
+  type        = string
+  default     = "single"
+
+  validation {
+    condition     = contains(["single", "per_az"], var.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be either single or per_az."
+  }
+}

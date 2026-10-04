@@ -3,6 +3,7 @@ module "network" {
 
   vpc_cidr           = var.vpc_cidr
   availability_zones = var.availability_zones
+  nat_gateway_mode   = var.nat_gateway_mode
   name_prefix        = local.name_prefix
   common_tags        = local.common_tags
 }
