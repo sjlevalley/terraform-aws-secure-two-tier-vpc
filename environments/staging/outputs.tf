@@ -42,3 +42,18 @@ output "alb_access_logs_bucket_name" {
   description = "S3 bucket that stores public and internal ALB access logs"
   value       = var.enable_alb_access_logs ? aws_s3_bucket.alb_access_logs[0].bucket : null
 }
+
+output "vpc_endpoint_security_group_id" {
+  description = "Security group ID attached to interface VPC endpoints"
+  value       = var.enable_vpc_endpoints ? module.vpc_endpoints[0].endpoint_security_group_id : null
+}
+
+output "s3_vpc_endpoint_id" {
+  description = "ID of the S3 gateway endpoint"
+  value       = var.enable_vpc_endpoints ? module.vpc_endpoints[0].s3_endpoint_id : null
+}
+
+output "interface_vpc_endpoint_ids" {
+  description = "Interface endpoint IDs keyed by service name"
+  value       = var.enable_vpc_endpoints ? module.vpc_endpoints[0].interface_endpoint_ids : {}
+}

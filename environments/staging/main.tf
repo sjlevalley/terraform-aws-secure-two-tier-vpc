@@ -17,6 +17,23 @@ module "security_groups" {
   common_tags = local.common_tags
 }
 
+module "vpc_endpoints" {
+  count  = var.enable_vpc_endpoints ? 1 : 0
+  source = "../../modules/vpc-endpoints"
+
+  name_prefix             = local.name_prefix
+  common_tags             = local.common_tags
+  vpc_id                  = module.network.vpc_id
+  aws_region              = var.aws_region
+  private_subnet_ids      = module.network.private_subnet_ids
+  private_route_table_ids = module.network.private_route_table_ids
+
+  allowed_security_group_ids = {
+    web = module.security_groups.web_security_group_id
+    app = module.security_groups.app_security_group_id
+  }
+}
+
 module "load_balancing" {
   source = "../../modules/load-balancing"
 
@@ -131,3 +148,4 @@ resource "aws_route53_record" "app" {
     evaluate_target_health = true
   }
 }
+

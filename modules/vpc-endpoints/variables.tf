@@ -29,6 +29,6 @@ variable "private_route_table_ids" {
 }
 
 variable "allowed_security_group_ids" {
-  description = "Security group IDs allowed to connect to interface endpoints over HTTPS"
-  type        = set(string)
+  description = "Security group IDs allowed to connect to interface endpoints over HTTPS, keyed by workload name"
+  type        = map(string)
 }

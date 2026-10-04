@@ -72,3 +72,9 @@ variable "nat_gateway_mode" {
     error_message = "nat_gateway_mode must be either single or per_az."
   }
 }
+
+variable "enable_vpc_endpoints" {
+  description = "Whether to create VPC endpoints for private AWS service access"
+  type        = bool
+  default     = true
+}
