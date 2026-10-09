@@ -59,3 +59,10 @@ module "load_balancing" {
     aws_s3_bucket_policy.alb_access_logs
   ]
 }
+
+module "instance_identity" {
+  source = "../../modules/instance-identity"
+
+  name_prefix = local.name_prefix
+  common_tags = local.common_tags
+}
