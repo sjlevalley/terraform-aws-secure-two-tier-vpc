@@ -9,4 +9,7 @@ alarm_email        = "REPLACE_WITH_TEST_ALERT_EMAIL"
 
 enable_alb_access_logs         = true
 alb_access_logs_retention_days = 90
-enable_vpc_endpoints = true
+enable_vpc_endpoints           = true
+enable_waf                     = false
+waf_rate_limit                 = 2000
+waf_managed_rules_count_mode   = true

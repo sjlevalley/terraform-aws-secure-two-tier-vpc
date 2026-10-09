@@ -10,3 +10,7 @@ alarm_email                    = ""
 enable_alb_access_logs         = true
 alb_access_logs_retention_days = 365
 enable_vpc_endpoints           = true
+enable_alb_deletion_protection = false
+enable_waf                     = true
+waf_rate_limit                 = 2000
+waf_managed_rules_count_mode   = true
