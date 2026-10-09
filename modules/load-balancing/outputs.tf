@@ -44,3 +44,8 @@ output "app_target_group_arn_suffix" {
   description = "ARN suffix used for app target group CloudWatch metrics"
   value       = aws_lb_target_group.app.arn_suffix
 }
+
+output "public_alb_arn" {
+  description = "ARN of the public application load balancer"
+  value       = aws_lb.public.arn
+}

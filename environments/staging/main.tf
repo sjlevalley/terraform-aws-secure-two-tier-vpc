@@ -149,3 +149,13 @@ resource "aws_route53_record" "app" {
   }
 }
 
+module "waf" {
+  count  = var.enable_waf ? 1 : 0
+  source = "../../modules/waf"
+
+  name_prefix              = local.name_prefix
+  common_tags              = local.common_tags
+  alb_arn                  = module.load_balancing.public_alb_arn
+  rate_limit               = var.waf_rate_limit
+  managed_rules_count_mode = var.waf_managed_rules_count_mode
+}

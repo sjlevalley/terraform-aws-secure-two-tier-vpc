@@ -84,3 +84,21 @@ variable "enable_alb_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "enable_waf" {
+  description = "Whether to create and associate AWS WAF with the public ALB"
+  type        = bool
+  default     = true
+}
+
+variable "waf_rate_limit" {
+  description = "Maximum requests allowed from a single IP in a 5-minute period"
+  type        = number
+  default     = 2000
+}
+
+variable "waf_managed_rules_count_mode" {
+  description = "Whether AWS managed WAF rule groups should run in count mode"
+  type        = bool
+  default     = true
+}
