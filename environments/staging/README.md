@@ -2,7 +2,7 @@
 
 This Terraform root deploys the staging version of the Secure Two-Tier VPC architecture. Staging is intended to validate changes before production while remaining cost-aware during development.
 
-At the moment, staging uses the same core architecture as dev with separate environment identity, a separate CIDR range, separate DNS values, and an explicit NAT Gateway mode setting.
+Staging extends the dev shape with private AWS service access through VPC endpoints and an optional AWS WAF module that can be enabled for pre-production testing.
 
 ## Architecture
 
@@ -10,16 +10,17 @@ At the moment, staging uses the same core architecture as dev with separate envi
 flowchart TB
   user([Internet users])
 
-  subgraph edge[DNS and certificate]
+  subgraph edge[DNS, certificate, and optional edge protection]
     direction LR
     r53[Route 53<br/>alias A record for staging hostname]
     acm[ACM certificate<br/>DNS validated]
+    waf[AWS WAF<br/>optional, disabled by default]
     r53 -. validation CNAME records .-> acm
   end
 
   user -->|1. DNS lookup| r53
-  user ==>|2. HTTPS 443| igw
-  user -. HTTP 80 redirects to HTTPS .-> igw
+  user ==>|2. HTTPS 443| waf
+  user -. HTTP 80 redirects to HTTPS .-> waf
 
   subgraph vpc[Staging VPC across two Availability Zones]
     igw[Internet Gateway]
@@ -35,12 +36,22 @@ flowchart TB
       appAsg[App Auto Scaling Group<br/>Flask/Gunicorn on port 8080]
     end
 
+    subgraph endpoints[VPC endpoints]
+      s3[S3 gateway endpoint]
+      interfaces[SSM, SSM Messages, EC2 Messages,<br/>CloudWatch Logs, CloudWatch Metrics]
+    end
+
+    waf ==> igw
     igw ==> publicAlb
     publicAlb ==>|3. HTTP 80 inside the VPC| webAsg
     webAsg ==>|4. HTTP 8080 for /api| internalAlb
     internalAlb ==>|5. HTTP 8080| appAsg
     webAsg -. outbound bootstrap and AWS APIs .-> nat
     appAsg -. outbound bootstrap and AWS APIs .-> nat
+    webAsg -. private AWS APIs .-> interfaces
+    appAsg -. private AWS APIs .-> interfaces
+    webAsg -. S3 .-> s3
+    appAsg -. S3 .-> s3
   end
 
   acm --> publicAlb
@@ -63,6 +74,8 @@ flowchart TB
 - Resource prefix: `secure-two-tier-staging`
 - Environment tag: `staging`
 - NAT Gateway mode is explicit and currently expected to be `single`
+- VPC endpoints are enabled by default for S3, SSM, SSM Messages, EC2 Messages, CloudWatch Logs, and CloudWatch Metrics
+- AWS WAF module is available but disabled by default through `enable_waf = false`
 - Public and internal Application Load Balancers
 - Private web and app Auto Scaling Groups
 - Route 53 alias record and ACM DNS validation
@@ -89,11 +102,23 @@ cp staging.tfvars.example staging.tfvars
 Set environment-specific values:
 
 ```hcl
-vpc_cidr         = "10.20.0.0/16"
-domain_name      = "staging.example.com"
-hosted_zone_id   = "REPLACE_WITH_ROUTE53_HOSTED_ZONE_ID"
-alarm_email      = "REPLACE_WITH_TEST_ALERT_EMAIL"
-nat_gateway_mode = "single"
+aws_region         = "us-east-1"
+nat_gateway_mode   = "single"
+vpc_cidr           = "10.20.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+instance_type      = "t3.micro"
+app_port           = 8080
+
+domain_name    = "staging.example.com"
+hosted_zone_id = "REPLACE_WITH_ROUTE53_HOSTED_ZONE_ID"
+alarm_email    = "REPLACE_WITH_TEST_ALERT_EMAIL"
+
+enable_alb_access_logs         = true
+alb_access_logs_retention_days = 90
+enable_vpc_endpoints           = true
+enable_waf                     = false
+waf_rate_limit                 = 2000
+waf_managed_rules_count_mode   = true
 ```
 
 Do not commit `staging.tfvars`, `tfplan`, `.terraform/`, or Terraform state files.

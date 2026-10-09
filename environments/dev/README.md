@@ -125,10 +125,19 @@ cp dev.tfvars.example dev.tfvars
 Set environment-specific values:
 
 ```hcl
-domain_name      = "dev.example.com"
-hosted_zone_id   = "REPLACE_WITH_ROUTE53_HOSTED_ZONE_ID"
-alarm_email      = null
-nat_gateway_mode = "single"
+aws_region         = "us-east-1"
+nat_gateway_mode   = "single"
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+instance_type      = "t3.micro"
+app_port           = 8080
+
+domain_name    = "dev.example.com"
+hosted_zone_id = "REPLACE_WITH_ROUTE53_HOSTED_ZONE_ID"
+alarm_email    = null
+
+enable_alb_access_logs         = true
+alb_access_logs_retention_days = 90
 ```
 
 Do not commit `dev.tfvars`, `tfplan`, `.terraform/`, or Terraform state files.
