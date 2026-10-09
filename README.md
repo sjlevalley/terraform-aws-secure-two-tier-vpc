@@ -1,6 +1,6 @@
 # Terraform AWS Secure Two-Tier VPC
 
-This Terraform AWS Secure Two-Tier VPC portfolio project demonstrates a secure, multi-environment AWS application platform using Infrastructure-as-Code. It starts with a cost-conscious dev environment, promotes through staging, and is designed toward a more resilient production environment with stronger availability, observability, and edge protection.
+This Terraform AWS Secure Two-Tier VPC portfolio project demonstrates a secure, multi-environment AWS application platform using Infrastructure-as-Code. It starts with a cost-conscious dev environment, promotes through staging, and includes a production-shaped environment with stronger availability, observability, private AWS service access, and edge protection.
 
 The motivation behind this project was to build a hands-on demonstration of concepts learned through the AWS Solutions Architect Associate exam: versioned infrastructure, VPC design, private compute, load-balanced application tiers, operational visibility, least-privilege network paths, and environment promotion.
 
@@ -11,14 +11,14 @@ dev -> staging -> production
 ```
 
 - `dev` is optimized for lower-cost iteration and learning.
-- `staging` is production-like validation with separate naming, CIDR, DNS, state, and configurable networking behavior.
-- `prod` is the target production root for the most resilient version of the architecture.
+- `staging` is production-like validation with separate naming, CIDR, DNS, optional WAF testing, and private AWS service access through VPC endpoints.
+- `prod` is the most resilient root, with per-AZ NAT, VPC endpoints, WAF, production log retention, and demo-friendly teardown defaults.
 
 Each environment is a separate Terraform root module under `environments/` and reuses the shared modules under `modules/`.
 
-## Target Production Architecture
+## Production Architecture
 
-This diagram represents the intended production architecture for the project. Environment-specific READMEs describe what each root module currently deploys.
+This diagram represents the current production-shaped architecture for the project. Environment-specific READMEs describe the exact settings and defaults for each root module.
 
 Numbered edges show the application request path. Thick lines carry application traffic, dotted lines represent DNS, certificate validation, telemetry, control plane, and private AWS service access.
 
@@ -42,7 +42,7 @@ flowchart TB
     igw[Internet Gateway]
 
     subgraph public[Public subnets]
-      publicAlb[Public Application Load Balancer<br/>443 HTTPS listener: TLS termination<br/>80 HTTP listener: 301 redirect<br/>deletion protection enabled]
+      publicAlb[Public Application Load Balancer<br/>443 HTTPS listener: TLS termination<br/>80 HTTP listener: 301 redirect<br/>deletion protection configurable]
       natA[NAT Gateway AZ A]
       natB[NAT Gateway AZ B]
     end
@@ -121,11 +121,13 @@ Production-oriented supporting components:
 - VPC endpoints for Systems Manager, CloudWatch, and S3 access from private subnets
 - Route 53 alias record for the production hostname
 - ACM certificate with DNS validation
-- AWS WAF associated with the public ALB
+- AWS WAF associated with the public ALB, with managed rules in count mode by default
 - IAM instance profile for AWS Systems Manager access
 - CloudWatch log groups, metrics, alarms, dashboard, and SNS email notifications
-- Encrypted S3 bucket for public and internal ALB access logs
+- Encrypted S3 bucket for public and internal ALB access logs, with environment-specific retention
 - Security groups using source security group references instead of broad private CIDR rules
+
+For the demo configuration, production ALB deletion protection is configurable but disabled in the sample values so resources can be destroyed cleanly. Enable it for a long-lived production deployment.
 
 ## Security Flow
 
@@ -169,8 +171,10 @@ flowchart TD
   modules --> observability[modules/observability]
   modules --> compute[modules/compute]
 
-  prod -. target .-> waf[modules/waf]
-  prod -. target .-> endpoints[modules/vpc-endpoints]
+  staging --> waf[modules/waf]
+  prod --> waf
+  staging --> endpoints[modules/vpc-endpoints]
+  prod --> endpoints
 
   network --> security
   network --> lb
@@ -199,6 +203,8 @@ flowchart TD
 - Encrypted S3 ALB access logs with lifecycle retention
 - IMDSv2 enforcement and encrypted `gp3` root volumes
 - Systems Manager-ready instance identity without SSH keys
+- Reusable WAF module for staging and production edge protection
+- Reusable VPC endpoints module for private AWS service access
 - Nginx reverse proxy from the web tier to the internal app endpoint
 
 ## Repository Layout
@@ -217,6 +223,7 @@ flowchart TD
 |   |   `-- dev.tfvars.example
 |   |-- staging/
 |   |   |-- README.md
+|   |   |-- alb-access-logs.tf
 |   |   |-- main.tf
 |   |   |-- variables.tf
 |   |   |-- outputs.tf
@@ -224,14 +231,23 @@ flowchart TD
 |   |   |-- versions.tf
 |   |   `-- staging.tfvars.example
 |   `-- prod/
-|       `-- README.md
+|       |-- README.md
+|       |-- alb-access-logs.tf
+|       |-- main.tf
+|       |-- variables.tf
+|       |-- outputs.tf
+|       |-- locals.tf
+|       |-- versions.tf
+|       `-- prod.tfvars.sample
 |-- modules/
 |   |-- compute/
 |   |-- instance-identity/
 |   |-- load-balancing/
 |   |-- network/
 |   |-- observability/
-|   `-- security-groups/
+|   |-- security-groups/
+|   |-- vpc-endpoints/
+|   `-- waf/
 ```
 
 Reusable infrastructure code lives under `modules/`. Environment roots live under `environments/`.
@@ -243,10 +259,13 @@ Start with:
 - `environments/dev/README.md` for the current dev environment
 - `environments/staging/README.md` for the current staging environment
 - `environments/staging/main.tf` for the staging root module
-- `environments/prod/README.md` for the production target notes
+- `environments/prod/README.md` for the current production-shaped environment
+- `environments/prod/main.tf` for the production root module
 - `modules/network/main.tf` for VPC, subnet, NAT, and routing design
 - `modules/security-groups/main.tf` for the network access model
 - `modules/load-balancing/main.tf` for public and internal ALB configuration
+- `modules/vpc-endpoints/main.tf` for private AWS service endpoints
+- `modules/waf/main.tf` for WAF managed rules and rate limiting
 - `modules/compute/main.tf` for Launch Templates and Auto Scaling Groups
 - `modules/compute/templates/` for the web and application bootstrap scripts
 - `modules/observability/main.tf` for CloudWatch logs, metrics, alarms, dashboard, and SNS
@@ -270,6 +289,15 @@ cd environments/staging
 terraform init
 terraform validate
 terraform plan -var-file="staging.tfvars" -out=tfplan
+```
+
+For production-shaped demo deployment:
+
+```bash
+cd environments/prod
+terraform init
+terraform validate
+terraform plan -var-file="prod.tfvars" -out=tfplan
 ```
 
 Do not commit real `*.tfvars`, `tfplan`, `.terraform/`, or Terraform state files. They are intentionally ignored.
@@ -304,7 +332,7 @@ Destroy only from the environment root you intend to remove:
 terraform destroy -var-file="dev.tfvars"
 ```
 
-Use extra caution with staging and production state. Production should use isolated remote state, deletion protection where appropriate, and deliberate review before destroy.
+Use extra caution with staging and production state. Production should use isolated remote state, deletion protection where appropriate, and deliberate review before destroy. This demo keeps production ALB deletion protection disabled in the sample values so teardown remains straightforward.
 
 ## Public Repo Hygiene
 
