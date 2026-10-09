@@ -66,3 +66,9 @@ variable "internal_alb_access_logs_prefix" {
   type        = string
   default     = null
 }
+
+variable "enable_alb_deletion_protection" {
+  description = "Whether deletion protection is enabled for the public and internal ALBs"
+  type        = bool
+  default     = false
+}

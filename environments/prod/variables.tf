@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "vpc_cidr" {
   description = "CIDR range for the VPC"
   type        = string
-  default     = "10.20.0.0/16"
+  default     = "10.40.0.0/16"
 }
 
 variable "availability_zones" {
@@ -77,4 +77,10 @@ variable "enable_vpc_endpoints" {
   description = "Whether to create VPC endpoints for private AWS service access"
   type        = bool
   default     = true
+}
+
+variable "enable_alb_deletion_protection" {
+  description = "Whether deletion protection is enabled for the public and internal ALBs"
+  type        = bool
+  default     = false
 }

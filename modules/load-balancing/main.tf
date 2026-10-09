@@ -6,7 +6,7 @@ resource "aws_lb" "internal" {
   security_groups = [var.internal_alb_security_group_id]
   subnets         = values(var.private_subnet_ids)
 
-  enable_deletion_protection = false
+  enable_deletion_protection = var.enable_alb_deletion_protection
   drop_invalid_header_fields = true
 
   access_logs {
@@ -71,7 +71,7 @@ resource "aws_lb" "public" {
   security_groups = [var.public_alb_security_group_id]
   subnets         = values(var.public_subnet_ids)
 
-  enable_deletion_protection = false
+  enable_deletion_protection = var.enable_alb_deletion_protection
   drop_invalid_header_fields = true
 
   access_logs {
