@@ -53,7 +53,7 @@ module "load_balancing" {
   alb_access_logs_bucket          = var.enable_alb_access_logs ? aws_s3_bucket.alb_access_logs[0].bucket : null
   public_alb_access_logs_prefix   = "public-alb"
   internal_alb_access_logs_prefix = "internal-alb"
-  enable_alb_deletion_protection = var.enable_alb_deletion_protection
+  enable_alb_deletion_protection  = var.enable_alb_deletion_protection
 
   depends_on = [
     aws_s3_bucket_policy.alb_access_logs
@@ -100,4 +100,52 @@ module "observability" {
   alarm_email                 = var.alarm_email
   web_asg_name                = module.compute.web_asg_name
   app_asg_name                = module.compute.app_asg_name
+}
+
+
+resource "aws_acm_certificate" "public" {
+  domain_name       = var.domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-public-cert"
+  })
+}
+
+resource "aws_route53_record" "certificate_validation" {
+  for_each = {
+    for option in aws_acm_certificate.public.domain_validation_options :
+    option.domain_name => {
+      name   = option.resource_record_name
+      record = option.resource_record_value
+      type   = option.resource_record_type
+    }
+  }
+
+  zone_id = var.hosted_zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+}
+
+resource "aws_acm_certificate_validation" "public" {
+  certificate_arn         = aws_acm_certificate.public.arn
+  validation_record_fqdns = [for record in aws_route53_record.certificate_validation : record.fqdn]
+}
+
+resource "aws_route53_record" "app" {
+  zone_id = var.hosted_zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.load_balancing.public_alb_dns_name
+    zone_id                = module.load_balancing.public_alb_zone_id
+    evaluate_target_health = true
+  }
 }
