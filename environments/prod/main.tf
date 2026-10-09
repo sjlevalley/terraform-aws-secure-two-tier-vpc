@@ -66,3 +66,24 @@ module "instance_identity" {
   name_prefix = local.name_prefix
   common_tags = local.common_tags
 }
+
+
+module "compute" {
+  source = "../../modules/compute"
+
+  public_subnet_ids     = module.network.public_subnet_ids
+  private_subnet_ids    = module.network.private_subnet_ids
+  web_security_group_id = module.security_groups.web_security_group_id
+  app_security_group_id = module.security_groups.app_security_group_id
+  instance_type         = var.instance_type
+  name_prefix           = local.name_prefix
+  common_tags           = local.common_tags
+
+  instance_profile_name = module.instance_identity.instance_profile_name
+  internal_alb_dns_name = module.load_balancing.internal_alb_dns_name
+  app_port              = var.app_port
+  web_target_group_arn  = module.load_balancing.web_target_group_arn
+  app_target_group_arn  = module.load_balancing.app_target_group_arn
+
+  log_group_names = module.observability.log_group_names
+}
